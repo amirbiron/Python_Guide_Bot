@@ -1014,8 +1014,8 @@ squares = [x**2 for x in range(10)]</code>
 # יצירה:
 python -m venv myenv
 
-# הפעלה (Windows):
-myenv\Scripts\activate
+  # הפעלה (Windows):
+  myenv\\Scripts\\activate
 
 # הפעלה (Mac/Linux):
 source myenv/bin/activate

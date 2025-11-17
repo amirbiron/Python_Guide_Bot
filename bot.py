@@ -6,6 +6,7 @@ Python Learning Bot - בוט טלגרם ללימוד Python
 import logging
 import sys
 from telegram import Update
+from telegram.helpers import escape_html
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -100,11 +101,12 @@ def format_progress_bar(completed, total, length=10):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """פקודת /start"""
     user_data = get_or_create_user(update)
+    first_name = escape_html(user_data.get('first_name') or "חבר")
     
     welcome_message = f"""
 🎉 <b>ברוכים הבאים לבוט ללימוד Python!</b> 🐍
 
-שלום {user_data['first_name']}! 👋
+שלום {first_name}! 👋
 
 אני כאן כדי ללמד אותך Python מההתחלה ועד רמה מתקדמת!
 
