@@ -4,6 +4,7 @@ Python Learning Bot - בוט טלגרם ללימוד Python
 """
 
 import logging
+import sys
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -11,6 +12,44 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes
 )
+
+
+def _ensure_ptb_py313_compatibility():
+    """
+    python-telegram-bot<=20.7 מפעיל Updater עם שדה פרטי חדש שלא הוגדר ב-__slots__.
+    בפייתון 3.13 אין יותר __dict__ אוטומטי למחלקות עם __slots__, ולכן נוצרת AttributeError.
+    הפונקציה מוודאת שקיים slot מתאים על-ידי החלפת המחלקה במחלקת משנה תואמת.
+    """
+    if sys.version_info < (3, 13):
+        return
+
+    try:
+        import telegram.ext as telegram_ext
+        import telegram.ext._applicationbuilder as applicationbuilder_module
+        import telegram.ext._updater as updater_module
+    except Exception:
+        return
+
+    base_updater = updater_module.Updater
+    slot_name = "_Updater__polling_cleanup_cb"
+    slots = getattr(base_updater, "__slots__", ())
+
+    if isinstance(slots, tuple) and slot_name in slots:
+        return
+
+    class _PatchedUpdater(base_updater):  # type: ignore[misc, valid-type]
+        __slots__ = (slot_name,)
+
+    _PatchedUpdater.__module__ = base_updater.__module__
+    _PatchedUpdater.__name__ = base_updater.__name__
+    _PatchedUpdater.__qualname__ = base_updater.__qualname__
+
+    updater_module.Updater = _PatchedUpdater
+    telegram_ext.Updater = _PatchedUpdater
+    applicationbuilder_module.Updater = _PatchedUpdater
+    logging.getLogger(__name__).info(
+        "Patched python-telegram-bot Updater for Python 3.13 compatibility."
+    )
 
 from config import TELEGRAM_BOT_TOKEN
 from database import db
@@ -30,6 +69,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+_ensure_ptb_py313_compatibility()
 
 # ========== פונקציות עזר ==========
 
