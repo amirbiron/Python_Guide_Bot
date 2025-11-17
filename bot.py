@@ -6,13 +6,26 @@ Python Learning Bot - בוט טלגרם ללימוד Python
 import logging
 import sys
 from telegram import Update
-from telegram.helpers import escape_html
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
     ContextTypes
 )
+
+try:
+    from telegram.helpers import escape_html  # type: ignore
+except ImportError:
+    from html import escape as html_escape
+
+    def escape_html(value: str | None) -> str:
+        """
+        Fallback escape function for environments where python-telegram-bot
+        no longer exports escape_html (e.g. PTB 21+).
+        """
+        if not value:
+            return ""
+        return html_escape(value, quote=False)
 
 
 def _ensure_ptb_py313_compatibility():
