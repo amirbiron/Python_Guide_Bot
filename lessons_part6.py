@@ -306,7 +306,7 @@ class UserDatabase:
         self.init_db()
     
     def init_db(self):
-        """יצירת טבלה אם לא קיימת"""
+        '''יצירת טבלה אם לא קיימת'''
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -321,7 +321,7 @@ class UserDatabase:
             conn.commit()
     
     def add_user(self, username: str, email: str, age: int) -> bool:
-        """הוספת משתמש חדש"""
+        '''הוספת משתמש חדש'''
         try:
             with sqlite3.connect(self.db_name) as conn:
                 cursor = conn.cursor()
@@ -335,7 +335,7 @@ class UserDatabase:
             return False
     
     def get_user(self, username: str) -> Optional[Dict]:
-        """קבלת משתמש"""
+        '''קבלת משתמש'''
         with sqlite3.connect(self.db_name) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -347,7 +347,7 @@ class UserDatabase:
             return dict(row) if row else None
     
     def get_all_users(self) -> List[Dict]:
-        """קבלת כל המשתמשים"""
+        '''קבלת כל המשתמשים'''
         with sqlite3.connect(self.db_name) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -355,7 +355,7 @@ class UserDatabase:
             return [dict(row) for row in cursor.fetchall()]
     
     def update_user(self, username: str, **kwargs) -> bool:
-        """עדכון משתמש"""
+        '''עדכון משתמש'''
         if not kwargs:
             return False
         
@@ -372,7 +372,7 @@ class UserDatabase:
             return cursor.rowcount > 0
     
     def delete_user(self, username: str) -> bool:
-        """מחיקת משתמש"""
+        '''מחיקת משתמש'''
         with sqlite3.connect(self.db_name) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -898,16 +898,16 @@ python -m venv my_project_env</code>
 
 🔌 <b>הפעלת ה-venv:</b>
 <code># Windows (CMD):
-myenv\Scripts\activate.bat
+  myenv\\Scripts\\activate.bat
 
 # Windows (PowerShell):
-myenv\Scripts\Activate.ps1
+  myenv\\Scripts\\Activate.ps1
 
 # Mac/Linux:
 source myenv/bin/activate
 
 # אחרי הפעלה תראה:
-(myenv) C:\Users\...></code>
+  (myenv) C:\\Users\\...></code>
 
 📥 <b>התקנת חבילות ב-venv:</b>
 <code># התקנה:
@@ -1211,7 +1211,7 @@ python -m venv venv
 
 # הפעלה:
 source venv/bin/activate  # Mac/Linux
-venv\Scripts\activate     # Windows
+  venv\\Scripts\\activate     # Windows
 
 # התקנת תלויות:
 pip install -r requirements.txt
@@ -1702,7 +1702,7 @@ cd todo-api
 # venv:
 python -m venv venv
 source venv/bin/activate  # Mac/Linux
-venv\Scripts\activate     # Windows
+  venv\\Scripts\\activate     # Windows
 
 # התקנת חבילות:
 pip install flask flask-sqlalchemy flask-jwt-extended flask-cors
@@ -1804,7 +1804,7 @@ api = Blueprint('api', __name__)
 
 @api.route('/register', methods=['POST'])
 def register():
-    """רישום משתמש חדש"""
+    '''רישום משתמש חדש'''
     data = request.get_json()
     
     if User.query.filter_by(username=data['username']).first():
@@ -1829,7 +1829,7 @@ def register():
 
 @api.route('/login', methods=['POST'])
 def login():
-    """התחברות"""
+    '''התחברות'''
     data = request.get_json()
     
     user = User.query.filter_by(username=data['username']).first()
@@ -1849,7 +1849,7 @@ def login():
 @api.route('/todos', methods=['GET'])
 @jwt_required()
 def get_todos():
-    """קבלת כל המשימות"""
+    '''קבלת כל המשימות'''
     user_id = get_jwt_identity()
     
     # פילטרים:
@@ -1872,7 +1872,7 @@ def get_todos():
 @api.route('/todos', methods=['POST'])
 @jwt_required()
 def create_todo():
-    """יצירת משימה חדשה"""
+    '''יצירת משימה חדשה'''
     user_id = get_jwt_identity()
     data = request.get_json()
     
@@ -1897,7 +1897,7 @@ def create_todo():
 @api.route('/todos/<int:todo_id>', methods=['GET'])
 @jwt_required()
 def get_todo(todo_id):
-    """קבלת משימה ספציפית"""
+    '''קבלת משימה ספציפית'''
     user_id = get_jwt_identity()
     
     todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
@@ -1910,7 +1910,7 @@ def get_todo(todo_id):
 @api.route('/todos/<int:todo_id>', methods=['PUT'])
 @jwt_required()
 def update_todo(todo_id):
-    """עדכון משימה"""
+    '''עדכון משימה'''
     user_id = get_jwt_identity()
     
     todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
@@ -1941,7 +1941,7 @@ def update_todo(todo_id):
 @api.route('/todos/<int:todo_id>', methods=['DELETE'])
 @jwt_required()
 def delete_todo(todo_id):
-    """מחיקת משימה"""
+    '''מחיקת משימה'''
     user_id = get_jwt_identity()
     
     todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
@@ -1957,7 +1957,7 @@ def delete_todo(todo_id):
 @api.route('/todos/<int:todo_id>/toggle', methods=['PATCH'])
 @jwt_required()
 def toggle_todo(todo_id):
-    """סימון משימה כהושלמה/לא הושלמה"""
+    '''סימון משימה כהושלמה/לא הושלמה'''
     user_id = get_jwt_identity()
     
     todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
@@ -2074,23 +2074,23 @@ DATABASE_URL=sqlite:///todo.db</code>
 
 🎯 <b>שימוש ב-API:</b>
 <code># רישום:
-curl -X POST http://localhost:5000/api/register \
-  -H "Content-Type: application/json" \
+  curl -X POST http://localhost:5000/api/register \\
+    -H "Content-Type: application/json" \\
   -d '{"username":"amir","email":"amir@example.com","password":"123456"}'
 
 # התחברות:
-curl -X POST http://localhost:5000/api/login \
-  -H "Content-Type: application/json" \
+  curl -X POST http://localhost:5000/api/login \\
+    -H "Content-Type: application/json" \\
   -d '{"username":"amir","password":"123456"}'
 
 # יצירת משימה (עם token):
-curl -X POST http://localhost:5000/api/todos \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  curl -X POST http://localhost:5000/api/todos \\
+    -H "Content-Type: application/json" \\
+    -H "Authorization: Bearer YOUR_TOKEN_HERE" \\
   -d '{"title":"ללמוד Python","priority":"high"}'
 
 # קבלת משימות:
-curl http://localhost:5000/api/todos \
+  curl http://localhost:5000/api/todos \\
   -H "Authorization: Bearer YOUR_TOKEN_HERE"</code>
 
 🎉 <b>מזל טוב!</b>
