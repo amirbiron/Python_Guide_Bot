@@ -5,6 +5,7 @@ Python Learning Bot - בוט טלגרם ללימוד Python
 
 import logging
 import sys
+import re
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -108,6 +109,71 @@ def format_progress_bar(completed, total, length=10):
     bar = "█" * filled + "░" * (length - filled)
     percentage = int((completed / total) * 100)
     return f"{bar} {percentage}%"
+
+
+def _escape_for_code_block(text: str) -> str:
+    """Escape special HTML chars inside <code> ... </code> blocks.
+
+    Telegram HTML parse mode requires escaping '<', '>' and '&' even inside code.
+    """
+    if not text:
+        return ""
+    # Order matters: escape ampersand first to avoid double-escaping
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    return text
+
+
+def sanitize_code_blocks(html_text: str) -> str:
+    """Find all <code>...</code> blocks and escape inner text for Telegram HTML.
+
+    Keeps outer tags (e.g., <b>, <i>) intact and only escapes within code blocks.
+    """
+    if not html_text:
+        return ""
+
+    def repl(match: re.Match[str]) -> str:
+        inner = match.group(1)
+        return f"<code>{_escape_for_code_block(inner)}</code>"
+
+    return re.sub(r"<code>([\s\S]*?)</code>", repl, html_text)
+
+
+def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
+    """Split an HTML-formatted message without breaking tags.
+
+    Tries to split at the last </code> before the limit; otherwise falls back to newline.
+    """
+    if len(text) <= max_len:
+        return [text]
+
+    parts: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_len, len(text))
+        if end == len(text):
+            parts.append(text[start:end])
+            break
+
+        # Prefer splitting right after a closing code tag within the window
+        window = text[start:end]
+        split_at = window.rfind("</code>")
+        if split_at != -1 and split_at + len("</code>") > max_len // 3:
+            cut = start + split_at + len("</code>")
+        else:
+            # Fallback: split on the last newline to avoid mid-word/tag cuts
+            nl_at = window.rfind("\n")
+            cut = start + (nl_at if nl_at != -1 else end)
+
+        # Safety net: ensure we make progress
+        if cut <= start:
+            cut = end
+
+        parts.append(text[start:cut])
+        start = cut
+
+    return parts
 
 # ========== Command Handlers ==========
 
@@ -372,22 +438,20 @@ async def show_lesson_callback(query, context, lesson_number):
         await query.edit_message_text("שיעור לא נמצא!")
         return
     
-    message_text = f"{lesson['title']}\n\n{lesson['content']}"
-    
-    # חלוקת הודעה אם היא ארוכה מדי
-    if len(message_text) > 4000:
-        # שלח בשני חלקים
-        await query.edit_message_text(
-            f"{lesson['title']}\n\n{lesson['content'][:3500]}...",
-            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
-            parse_mode='HTML'
-        )
-    else:
-        await query.edit_message_text(
-            message_text,
-            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
-            parse_mode='HTML'
-        )
+    sanitized_content = sanitize_code_blocks(lesson['content'])
+    message_text = f"{lesson['title']}\n\n{sanitized_content}"
+
+    parts = split_html_message_safely(message_text, max_len=4000)
+    # שליחת החלק הראשון עם מקלדת ניווט
+    await query.edit_message_text(
+        parts[0],
+        reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
+        parse_mode='HTML'
+    )
+    # אם יש חלקים נוספים - שלח אותם כהודעות המשך ללא מקלדת
+    if len(parts) > 1:
+        for extra_part in parts[1:]:
+            await query.message.reply_text(extra_part, parse_mode='HTML')
 
 async def show_lesson(update, context, lesson_number):
     """הצגת שיעור (מפקודה)"""
@@ -397,13 +461,18 @@ async def show_lesson(update, context, lesson_number):
         await update.message.reply_text("שיעור לא נמצא!")
         return
     
-    message_text = f"{lesson['title']}\n\n{lesson['content']}"
-    
+    sanitized_content = sanitize_code_blocks(lesson['content'])
+    message_text = f"{lesson['title']}\n\n{sanitized_content}"
+
+    parts = split_html_message_safely(message_text, max_len=4000)
     await update.message.reply_text(
-        message_text,
+        parts[0],
         reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
         parse_mode='HTML'
     )
+    if len(parts) > 1:
+        for extra_part in parts[1:]:
+            await update.message.reply_text(extra_part, parse_mode='HTML')
 
 async def show_exercise(query, lesson_number):
     """הצגת תרגיל"""
@@ -414,12 +483,14 @@ async def show_exercise(query, lesson_number):
         return
     
     exercise = lesson['exercise']
-    
+    # עטיפת השאלה ב-code כדי למנוע שגיאות HTML בטלגרם
+    question_html = f"<pre><code>{_escape_for_code_block(exercise['question'])}</code></pre>"
+
     exercise_text = f"""
 ✍️ <b>תרגיל - שיעור {lesson_number}</b>
 
 <b>שאלה:</b>
-{exercise['question']}
+{question_html}
 
 בחר את התשובה הנכונה:
 """
