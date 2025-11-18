@@ -140,6 +140,21 @@ def sanitize_code_blocks(html_text: str) -> str:
     return re.sub(r"<code>([\s\S]*?)</code>", repl, html_text)
 
 
+def escape_stray_angle_brackets(html_text: str) -> str:
+    """Escape '<' that are not part of allowed Telegram HTML tags.
+
+    This prevents sequences like '<=' or '< 5' in plain text from being
+    interpreted as invalid HTML tags (e.g., start tag '='), which causes
+    "Can't parse entities" errors in Telegram.
+    """
+    if not html_text:
+        return ""
+    # Allow list based on Telegram supported tags
+    allowed = r"(?:/?(?:b|strong|i|em|u|ins|s|strike|del|a|code|pre|br))"
+    pattern = re.compile(r"<(?!" + allowed + r"(?:\s|>|/))")
+    return pattern.sub("&lt;", html_text)
+
+
 def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
     """Split an HTML-formatted message without breaking tags.
 
@@ -439,19 +454,29 @@ async def show_lesson_callback(query, context, lesson_number):
         return
     
     sanitized_content = sanitize_code_blocks(lesson['content'])
-    message_text = f"{lesson['title']}\n\n{sanitized_content}"
+    safe_content = escape_stray_angle_brackets(sanitized_content)
+    message_text = f"{lesson['title']}\n\n{safe_content}"
 
     parts = split_html_message_safely(message_text, max_len=4000)
-    # שליחת החלק הראשון עם מקלדת ניווט
-    await query.edit_message_text(
-        parts[0],
-        reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
-        parse_mode='HTML'
-    )
-    # אם יש חלקים נוספים - שלח אותם כהודעות המשך ללא מקלדת
-    if len(parts) > 1:
-        for extra_part in parts[1:]:
+    # הצג את החלק הראשון ללא מקלדת, ואת האחרון עם מקלדת – כך הכפתורים יופיעו אחרי כל התוכן
+    if len(parts) == 1:
+        await query.edit_message_text(
+            parts[0],
+            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
+            parse_mode='HTML'
+        )
+    else:
+        # עדכן את ההודעה המקורית לחלק הראשון ללא מקלדת
+        await query.edit_message_text(parts[0], parse_mode='HTML')
+        # שלח את כל החלקים האמצעיים ללא מקלדת
+        for extra_part in parts[1:-1]:
             await query.message.reply_text(extra_part, parse_mode='HTML')
+        # שלח את החלק האחרון עם המקלדת כך שהכפתורים יופיעו בסוף
+        await query.message.reply_text(
+            parts[-1],
+            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
+            parse_mode='HTML'
+        )
 
 async def show_lesson(update, context, lesson_number):
     """הצגת שיעור (מפקודה)"""
@@ -462,17 +487,26 @@ async def show_lesson(update, context, lesson_number):
         return
     
     sanitized_content = sanitize_code_blocks(lesson['content'])
-    message_text = f"{lesson['title']}\n\n{sanitized_content}"
+    safe_content = escape_stray_angle_brackets(sanitized_content)
+    message_text = f"{lesson['title']}\n\n{safe_content}"
 
     parts = split_html_message_safely(message_text, max_len=4000)
-    await update.message.reply_text(
-        parts[0],
-        reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
-        parse_mode='HTML'
-    )
-    if len(parts) > 1:
-        for extra_part in parts[1:]:
+    if len(parts) == 1:
+        await update.message.reply_text(
+            parts[0],
+            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
+            parse_mode='HTML'
+        )
+    else:
+        # שלח את כל החלקים מלבד האחרון ללא מקלדת
+        for extra_part in parts[:-1]:
             await update.message.reply_text(extra_part, parse_mode='HTML')
+        # שלח את החלק האחרון עם המקלדת
+        await update.message.reply_text(
+            parts[-1],
+            reply_markup=lesson_menu_keyboard(lesson_number, TOTAL_LESSONS),
+            parse_mode='HTML'
+        )
 
 async def show_exercise(query, lesson_number):
     """הצגת תרגיל"""
