@@ -13,6 +13,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     ContextTypes
 )
+from activity_reporter import create_reporter
 
 try:
     from telegram.helpers import escape_html  # type: ignore
@@ -86,6 +87,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _ensure_ptb_py313_compatibility()
+
+reporter = create_reporter(
+    mongodb_uri="mongodb+srv://mumin:M43M2TFgLfGvhBwY@muminai.tm6x81b.mongodb.net/?retryWrites=true&w=majority&appName=muminAI",
+    service_id="srv-d4ddu6odl3ps73c0n7s0",
+    service_name="Python_Guide_Bot"
+)
 
 # ========== פונקציות עזר ==========
 
@@ -194,6 +201,7 @@ def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """פקודת /start"""
+    reporter.report_activity(update.effective_user.id)
     user_data = get_or_create_user(update)
     first_name = escape_html(user_data.get('first_name') or "חבר")
     
@@ -225,6 +233,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """פקודת /help"""
+    reporter.report_activity(update.effective_user.id)
     help_text = """
 ❓ <b>עזרה - Python Learning Bot</b>
 
@@ -255,6 +264,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def progress_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """פקודת /progress"""
+    reporter.report_activity(update.effective_user.id)
     user_data = get_or_create_user(update)
     progress = db.get_user_progress(user_data['user_id'])
     
@@ -288,6 +298,7 @@ async def progress_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """פקודת /lesson [מספר]"""
+    reporter.report_activity(update.effective_user.id)
     if not context.args:
         await update.message.reply_text("שימוש: /lesson [מספר]\nלדוגמה: /lesson 5")
         return
@@ -305,6 +316,7 @@ async def lesson_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """טיפול בלחיצות על כפתורים"""
+    reporter.report_activity(update.effective_user.id)
     query = update.callback_query
     await query.answer()
     
