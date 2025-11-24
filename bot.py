@@ -94,6 +94,10 @@ reporter = create_reporter(
     service_name="Python_Guide_Bot"
 )
 
+TELEGRAM_SAFE_MESSAGE_LIMIT = 4000
+# שומרים מרווח בטיחות לכך שגם אחרי המרות HTML האורך הכולל יישאר מתחת למגבלת טלגרם
+MAX_CODE_BLOCK_CHARS = 3200
+
 # ========== פונקציות עזר ==========
 
 def get_or_create_user(update: Update):
@@ -142,9 +146,38 @@ def sanitize_code_blocks(html_text: str) -> str:
 
     def repl(match: re.Match[str]) -> str:
         inner = match.group(1)
-        return f"<code>{_escape_for_code_block(inner)}</code>"
+        return _split_code_block(inner, MAX_CODE_BLOCK_CHARS)
 
     return re.sub(r"<code>([\s\S]*?)</code>", repl, html_text)
+
+
+def _split_code_block(inner_text: str, max_block_len: int) -> str:
+    """Split very long code blocks into smaller chunks before escaping HTML.
+
+    Telegram מגביל הודעות ל~4096 תווים, ולכן קטע קוד בודד ארוך מדי יישבר
+    לכמה בלוקים שכל אחד מהם עטוף מחדש ב-<code>...</code>.
+    """
+    if len(inner_text) <= max_block_len:
+        return f"<code>{_escape_for_code_block(inner_text)}</code>"
+
+    chunks: list[str] = []
+    start = 0
+    length = len(inner_text)
+
+    while start < length:
+        end = min(start + max_block_len, length)
+        newline = inner_text.rfind("\n", start, end)
+        if newline != -1 and newline > start:
+            end = newline + 1
+
+        chunk = inner_text[start:end]
+        if not chunk:
+            break
+
+        chunks.append(f"<code>{_escape_for_code_block(chunk)}</code>")
+        start = end
+
+    return "\n".join(chunks)
 
 
 def escape_stray_angle_brackets(html_text: str) -> str:
@@ -162,7 +195,10 @@ def escape_stray_angle_brackets(html_text: str) -> str:
     return pattern.sub("&lt;", html_text)
 
 
-def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
+def split_html_message_safely(
+    text: str,
+    max_len: int = TELEGRAM_SAFE_MESSAGE_LIMIT
+) -> list[str]:
     """Split an HTML-formatted message without breaking tags.
 
     Tries to split at the last </code> before the limit; otherwise falls back to newline.
@@ -174,19 +210,18 @@ def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
     start = 0
     while start < len(text):
         end = min(start + max_len, len(text))
+        window = text[start:end]
+
         if end == len(text):
-            parts.append(text[start:end])
+            parts.append(window)
             break
 
-        # Prefer splitting right after a closing code tag within the window
-        window = text[start:end]
-        split_at = window.rfind("</code>")
-        if split_at != -1 and split_at + len("</code>") > max_len // 3:
-            cut = start + split_at + len("</code>")
-        else:
-            # Fallback: split on the last newline to avoid mid-word/tag cuts
+        balanced_idx = _find_last_balanced_index(window)
+        if balanced_idx is None or balanced_idx == 0:
             nl_at = window.rfind("\n")
-            cut = start + (nl_at if nl_at != -1 else end)
+            cut = start + (nl_at if nl_at > 0 else len(window))
+        else:
+            cut = start + balanced_idx
 
         # Safety net: ensure we make progress
         if cut <= start:
@@ -196,6 +231,35 @@ def split_html_message_safely(text: str, max_len: int = 4000) -> list[str]:
         start = cut
 
     return parts
+
+
+def _find_last_balanced_index(window: str) -> int | None:
+    """Return the largest index where <code>...</code> tags are balanced."""
+    balance = 0
+    idx = 0
+    last_balanced: int | None = None
+
+    while idx < len(window):
+        next_open = window.find("<code>", idx)
+        next_close = window.find("</code>", idx)
+
+        if next_open == -1 and next_close == -1:
+            break
+
+        if next_open != -1 and (next_close == -1 or next_open < next_close):
+            balance += 1
+            idx = next_open + len("<code>")
+        else:
+            if balance > 0:
+                balance -= 1
+            idx = next_close + len("</code>")
+            if balance == 0:
+                last_balanced = idx
+
+    if balance == 0:
+        return len(window)
+
+    return last_balanced
 
 # ========== Command Handlers ==========
 
@@ -469,7 +533,10 @@ async def show_lesson_callback(query, context, lesson_number):
     safe_content = escape_stray_angle_brackets(sanitized_content)
     message_text = f"{lesson['title']}\n\n{safe_content}"
 
-    parts = split_html_message_safely(message_text, max_len=4000)
+    parts = split_html_message_safely(
+        message_text,
+        max_len=TELEGRAM_SAFE_MESSAGE_LIMIT
+    )
     # הצג את החלק הראשון ללא מקלדת, ואת האחרון עם מקלדת – כך הכפתורים יופיעו אחרי כל התוכן
     if len(parts) == 1:
         await query.edit_message_text(
@@ -502,7 +569,10 @@ async def show_lesson(update, context, lesson_number):
     safe_content = escape_stray_angle_brackets(sanitized_content)
     message_text = f"{lesson['title']}\n\n{safe_content}"
 
-    parts = split_html_message_safely(message_text, max_len=4000)
+    parts = split_html_message_safely(
+        message_text,
+        max_len=TELEGRAM_SAFE_MESSAGE_LIMIT
+    )
     if len(parts) == 1:
         await update.message.reply_text(
             parts[0],
