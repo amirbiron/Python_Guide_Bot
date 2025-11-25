@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-כל השיעורים במקום אחד - 35 שיעורים מלאים ללימוד Python
+כל השיעורים במקום אחד - 40 שיעורים מלאים ללימוד Python
 """
 
 from lessons import LESSONS
@@ -10,6 +10,7 @@ from lessons_part4 import LESSONS_PART4
 from lessons_part5 import LESSONS_PART5
 from lessons_part6 import LESSONS_PART6
 from lessons_part7 import LESSONS_PART7
+from lessons_part8 import LESSONS_PART8
 
 # איחוד כל השיעורים למילון אחד
 ALL_LESSONS = {}
@@ -20,6 +21,7 @@ ALL_LESSONS.update(LESSONS_PART4)    # שיעורים 16-20
 ALL_LESSONS.update(LESSONS_PART5)    # שיעורים 21-25
 ALL_LESSONS.update(LESSONS_PART6)    # שיעורים 26-30
 ALL_LESSONS.update(LESSONS_PART7)    # שיעורים 31-35
+ALL_LESSONS.update(LESSONS_PART8)    # שיעורים 36-40
 
 # סה"כ שיעורים
 TOTAL_LESSONS = len(ALL_LESSONS)
